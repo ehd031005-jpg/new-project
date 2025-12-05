@@ -59,58 +59,87 @@ export async function POST(request: NextRequest) {
 - Example style: "Critically analyze this article and discuss the broader implications. Provide a nuanced perspective on the topic."`
     }
     
-    // 기사 내용을 더 많이 사용 (5000자)
-    const articleContent = content.substring(0, 5000)
+    // 기사 내용을 더 많이 사용 (8000자로 증가)
+    const articleContent = content.substring(0, 8000)
     
     // STEP 1: AI를 사용하여 기사에서 구체적인 쟁점 추출 (강화된 버전)
-    const extractControversyPrompt = `You are an expert news analyst. Your task is to find a SPECIFIC CONTROVERSY or DEBATE in this article.
+    const extractControversyPrompt = `You are an expert news analyst. Your task is to DEEPLY ANALYZE this article and find a SPECIFIC, REAL CONTROVERSY or DEBATE.
 
 Article Title: ${title}
-Article Content: ${articleContent.substring(0, 4000)}
+Full Article Content (${articleContent.length} characters):
+${articleContent}
 
-CRITICAL: You MUST find a REAL controversy, not just "different perspectives exist". Look for:
-1. **Explicit disagreements**: "some say X, but others argue Y", "experts disagree", "divided opinion"
-2. **Conflicting groups**: supporters vs critics, proponents vs opponents, government vs citizens
-3. **Debates about specific policies/decisions**: pros and cons, benefits vs drawbacks
-4. **Trade-offs**: economic growth vs environmental protection, efficiency vs safety, cost vs quality
-5. **Specific numbers/statistics** that show different perspectives
+CRITICAL ANALYSIS INSTRUCTIONS:
+1. Read the ENTIRE article carefully - do not skip any paragraphs
+2. Identify ALL stakeholders mentioned (government, experts, businesses, citizens, organizations, etc.)
+3. Look for explicit disagreements, conflicts, or debates
+4. Extract specific numbers, statistics, dates, and policies mentioned
+5. Identify what different groups are saying about the same issue
+6. Find trade-offs, dilemmas, or conflicting interests
 
-If the article doesn't have an explicit controversy, identify what COULD be debated:
-- Potential negative consequences vs positive outcomes
-- Short-term benefits vs long-term risks
-- Different stakeholder perspectives (government, businesses, citizens, experts)
-- Different solutions to the problem
+WHAT TO LOOK FOR (in order of priority):
+1. **Direct Quotes**: Who said what? Are there conflicting statements?
+2. **Numbers & Statistics**: What do the numbers show? Do different groups interpret them differently?
+3. **Policy Debates**: Are there specific policies, laws, or decisions being debated?
+4. **Stakeholder Conflicts**: Which groups disagree? What are their specific arguments?
+5. **Economic vs Social**: Are there trade-offs between economic benefits and social costs?
+6. **Short-term vs Long-term**: Are there conflicts between immediate benefits and future consequences?
 
-MANDATORY: You MUST provide TWO CLEARLY OPPOSING SIDES with specific arguments. Do NOT say "there are different perspectives" - you must identify WHO says WHAT and WHY they disagree.
+MANDATORY REQUIREMENTS:
+- You MUST extract information DIRECTLY from the article text above
+- You MUST identify SPECIFIC groups, people, or organizations mentioned in the article
+- You MUST use EXACT quotes, numbers, or facts from the article
+- You MUST NOT make up information that is not in the article
+- You MUST NOT use generic phrases like "some people" or "experts" without identifying who they are from the article
+
+If the article doesn't have an explicit controversy, analyze what COULD be debated based on:
+- The stakeholders mentioned in the article
+- The specific facts, numbers, or events described
+- The potential implications of what is described
+- Different interpretations of the same facts
+
+MANDATORY OUTPUT: You MUST provide TWO CLEARLY OPPOSING SIDES with:
+- Specific group names from the article (e.g., "the government officials mentioned in paragraph 3", "environmental groups cited in the article")
+- Their specific arguments with quotes or paraphrased statements from the article
+- Specific numbers, dates, or facts that support each side
 
 Return your answer in this EXACT JSON format (no other text):
 {
-  "controversy": "One clear sentence describing what people are disagreeing about",
+  "controversy": "One clear sentence describing what people are disagreeing about, referencing specific details from the article",
   "side1": {
-    "group": "Specific group name (e.g., 'climate experts', 'government officials', 'hospital administrators')",
-    "argument": "Their specific claim with numbers/details (e.g., 'will create 2 million jobs' or 'will cost $500 billion')"
+    "group": "EXACT group name from the article (e.g., 'the government officials mentioned in paragraph 2', 'environmental groups cited in the article', 'hospital administrators quoted as saying...')",
+    "argument": "Their EXACT claim from the article with specific numbers/details/quotes (e.g., 'will create 2 million jobs by 2030' or 'will cost $500 billion according to the report')",
+    "evidence": "Specific quote, number, or fact from the article that supports this side"
   },
   "side2": {
-    "group": "Opposing group name (e.g., 'economic analysts', 'critics', 'opponents')",
-    "argument": "Their specific opposing claim with numbers/details (e.g., 'will cause 5% unemployment' or 'will harm small businesses')"
+    "group": "EXACT opposing group name from the article (e.g., 'economic analysts mentioned in the study', 'critics quoted in paragraph 5', 'opponents who argue...')",
+    "argument": "Their EXACT opposing claim from the article with specific numbers/details/quotes (e.g., 'will cause 5% unemployment according to the analysis' or 'will harm small businesses as stated in the report')",
+    "evidence": "Specific quote, number, or fact from the article that supports this side"
   },
-  "specificDetails": ["Exact numbers, percentages, policies, or events from the article (e.g., '50% by 2030', '$500 billion investment', 'new immigration law')"]
+  "specificDetails": ["Exact numbers, percentages, policies, dates, or events DIRECTLY from the article (e.g., '50% by 2030', '$500 billion investment', 'new immigration law passed in March')"],
+  "articleContext": "Brief summary of the main topic and why this controversy matters (2-3 sentences)"
 }
 
-IMPORTANT: If you cannot find two clear opposing sides, create a debate based on potential consequences or stakeholder differences. The controversy MUST be specific to this article, not generic.`
+CRITICAL: 
+- All information MUST come from the article text above
+- Use exact quotes when possible (with quotation marks)
+- Reference specific paragraphs or sections if helpful
+- If a group is not explicitly named, describe them based on what they said in the article
+- The controversy MUST be specific to THIS article, not a generic debate about the topic`
 
     let controversyData: {
       controversy: string
-      side1: { group: string; argument: string }
-      side2: { group: string; argument: string }
+      side1: { group: string; argument: string; evidence?: string }
+      side2: { group: string; argument: string; evidence?: string }
       specificDetails: string[]
+      articleContext?: string
     } | null = null
 
     try {
-      // 쟁점 추출 시도 (타임아웃 설정)
+      // 쟁점 추출 시도 (타임아웃 설정 - 더 긴 시간 허용)
       const controversyResponse = await Promise.race([
-        generateText(extractControversyPrompt, 'You are an expert at analyzing news articles and identifying controversies. You MUST respond with valid JSON only, no other text.'),
-        new Promise<string>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 15000))
+        generateText(extractControversyPrompt, 'You are an expert news analyst specializing in identifying controversies and debates in articles. You MUST carefully read the entire article and extract specific information. Always respond with valid JSON only, no other text. Use exact quotes and facts from the article.'),
+        new Promise<string>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 20000))
       ]) as string
       
       // JSON 추출 (여러 패턴 시도)
@@ -125,14 +154,27 @@ IMPORTANT: If you cannot find two clear opposing sides, create a debate based on
       if (jsonMatch) {
         try {
           const parsed = JSON.parse(jsonMatch[1])
-          // 데이터 검증
+          // 데이터 검증 (더 엄격하게)
           if (parsed.controversy && parsed.side1 && parsed.side2 && 
               parsed.side1.group && parsed.side1.argument && 
-              parsed.side2.group && parsed.side2.argument) {
+              parsed.side2.group && parsed.side2.argument &&
+              parsed.controversy.length > 30 && // 충분히 구체적인 쟁점 설명
+              parsed.side1.argument.length > 20 && // 충분히 구체적인 주장
+              parsed.side2.argument.length > 20) {
             controversyData = parsed
             console.log('Successfully extracted controversy:', parsed.controversy)
+            console.log('Side 1:', parsed.side1.group, '-', parsed.side1.argument)
+            console.log('Side 2:', parsed.side2.group, '-', parsed.side2.argument)
+            console.log('Specific details:', parsed.specificDetails)
           } else {
-            console.warn('Extracted controversy data is incomplete')
+            console.warn('Extracted controversy data is incomplete or too generic:', {
+              hasControversy: !!parsed.controversy,
+              hasSide1: !!(parsed.side1?.group && parsed.side1?.argument),
+              hasSide2: !!(parsed.side2?.group && parsed.side2?.argument),
+              controversyLength: parsed.controversy?.length || 0,
+              side1Length: parsed.side1?.argument?.length || 0,
+              side2Length: parsed.side2?.argument?.length || 0
+            })
           }
         } catch (e) {
           console.warn('Failed to parse controversy JSON:', e)
@@ -144,30 +186,60 @@ IMPORTANT: If you cannot find two clear opposing sides, create a debate based on
       console.warn('Failed to extract controversy, will use article content directly:', error)
     }
     
-    // 기사에서 핵심 키워드와 주제 추출 (간단한 추출)
+    // 기사에서 핵심 키워드와 주제 추출 (개선된 버전)
     const extractKeyTopics = (text: string): string[] => {
+      // 고유명사, 숫자, 중요한 단어 추출
+      const properNouns = text.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g) || []
+      const numbers = text.match(/\d+%|\$\d+|\d+\s+(?:million|billion|thousand|percent|people|countries|jobs|dollars)/gi) || []
       const words = text.toLowerCase()
         .replace(/[^\w\s]/g, ' ')
         .split(/\s+/)
-        .filter(word => word.length > 4)
+        .filter(word => word.length > 4 && !['this', 'that', 'these', 'those', 'their', 'there', 'would', 'could', 'should'].includes(word))
       
       const wordCount: Record<string, number> = {}
       words.forEach(word => {
         wordCount[word] = (wordCount[word] || 0) + 1
       })
       
-      return Object.entries(wordCount)
+      const topWords = Object.entries(wordCount)
         .sort(([, a], [, b]) => b - a)
         .slice(0, 10)
         .map(([word]) => word)
+      
+      // 고유명사와 숫자도 포함 (중복 제거 - Set 대신 Record 사용)
+      const combined = [...properNouns.slice(0, 5), ...numbers.slice(0, 3), ...topWords]
+      const seen: Record<string, boolean> = {}
+      const uniqueTopics: string[] = []
+      for (const item of combined) {
+        if (!seen[item.toLowerCase()]) {
+          seen[item.toLowerCase()] = true
+          uniqueTopics.push(item)
+        }
+      }
+      return uniqueTopics.slice(0, 15)
     }
     
     const keyTopics = extractKeyTopics(title + ' ' + articleContent)
     
-    // 기사 내용의 핵심 문장 추출 (첫 3-5 문장)
+    // 기사 내용의 핵심 문장 추출 (개선된 버전 - 더 많은 문장)
     const extractKeySentences = (text: string): string => {
       const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 20)
-      return sentences.slice(0, 5).join('. ').trim()
+      // 첫 3문장 + 중간 2문장 + 마지막 2문장 (더 균형잡힌 추출)
+      const firstSentences = sentences.slice(0, 3)
+      const middleSentences = sentences.slice(Math.floor(sentences.length / 2), Math.floor(sentences.length / 2) + 2)
+      const lastSentences = sentences.slice(-2)
+      // 중복 제거 (Set 대신 Record 사용)
+      const combined = [...firstSentences, ...middleSentences, ...lastSentences]
+      const seen: Record<string, boolean> = {}
+      const selected: string[] = []
+      for (const sentence of combined) {
+        const trimmed = sentence.trim()
+        if (!seen[trimmed]) {
+          seen[trimmed] = true
+          selected.push(trimmed)
+        }
+      }
+      return selected.join('. ').trim()
     }
     
     const keySentences = extractKeySentences(articleContent)
@@ -181,11 +253,14 @@ Main Controversy: ${cd.controversy}
 
 Side 1 - ${cd.side1.group}:
 ${cd.side1.argument}
+${cd.side1.evidence ? `Evidence: ${cd.side1.evidence}` : ''}
 
 Side 2 - ${cd.side2.group}:
 ${cd.side2.argument}
+${cd.side2.evidence ? `Evidence: ${cd.side2.evidence}` : ''}
 
 Specific Details from Article: ${cd.specificDetails.join(', ')}
+${cd.articleContext ? `\n\nArticle Context: ${cd.articleContext}` : ''}
 
 === YOUR TASK ===
 Create a debate question using the EXACT controversy above. Your question MUST:
@@ -202,12 +277,12 @@ CRITICAL: Your question MUST start with the controversy, NOT with "The article d
       controversySection = `=== ARTICLE INFORMATION ===
 Title: ${title}
 
-Key Topics/Keywords: ${keyTopics.join(', ')}
+Key Topics/Keywords/Entities: ${keyTopics.join(', ')}
 
-Key Content Excerpt:
+Key Content Excerpt (representative sentences from beginning, middle, and end):
 ${keySentences}
 
-Full Article Content:
+Full Article Content (${articleContent.length} characters):
 ${articleContent}
 
 === YOUR TASK ===
