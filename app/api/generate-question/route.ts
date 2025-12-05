@@ -71,8 +71,8 @@ export async function POST(request: NextRequest) {
     
     const keySentences = extractKeySentences(articleContent)
     
-    // 기사 내용을 기반으로 질문 생성 (강화된 프롬프트)
-    const prompt = `You are an English language teacher. Based on this specific news article, create a thought-provoking question that is DIRECTLY related to the article's content, main arguments, and specific details.
+    // 기사 내용을 분석하여 쟁점 기반 질문 생성
+    const prompt = `You are an English language teacher. Your task is to ANALYZE this news article, identify the KEY DEBATABLE ISSUES or CONTROVERSIAL POINTS, and create a question that asks students to engage with these specific issues.
 
 ${levelInstructions}
 
@@ -88,38 +88,77 @@ Full Article Content:
 ${articleContent}
 
 === YOUR TASK ===
-Create a question that:
-1. **MUST reference specific details, events, or arguments from the article** (e.g., "What do you think about [specific event/policy/issue mentioned in the article]?")
-2. **MUST be directly related to the article's main topic** - NOT a generic question
-3. **MUST encourage students to engage with the article's specific content** - ask about the article's implications, the events described, or the arguments presented
-4. Uses vocabulary and sentence complexity matching ${level} level
-5. Requires a written response appropriate for ${level} level (see word count above)
-6. Is open-ended and allows for various perspectives
+1. **ANALYZE the article** to identify:
+   - What are the main debatable issues or controversial points?
+   - What are the different perspectives or viewpoints mentioned?
+   - What are the potential benefits and drawbacks?
+   - What are the implications or consequences?
+   - What are the ethical, social, economic, or political concerns?
 
-=== EXAMPLES OF GOOD QUESTIONS ===
-- If the article is about climate change: "The article mentions that countries agreed to reduce emissions by 50% by 2030. Do you think this goal is achievable? What challenges might countries face?"
-- If the article is about technology: "The article discusses AI's impact on healthcare. How do you think AI will change the way doctors work in the future?"
-- If the article is about politics: "The article describes a new policy. What are the potential benefits and drawbacks of this policy?"
+2. **CREATE a question** that:
+   - Focuses on a SPECIFIC DEBATABLE ISSUE from the article (not just a summary)
+   - Asks students to take a position or analyze different perspectives
+   - References specific details, policies, events, or arguments from the article
+   - Encourages critical thinking about the controversy or debate
+   - Uses vocabulary and sentence complexity matching ${level} level
+   - Requires a written response appropriate for ${level} level (see word count above)
+
+=== EXAMPLES OF GOOD ISSUE-BASED QUESTIONS ===
+
+Example 1 - Climate Policy Article:
+"The article states that countries agreed to reduce emissions by 50% by 2030, but some experts argue this will hurt economic growth. What are the potential benefits and drawbacks of this policy? Do you think the environmental benefits outweigh the economic costs?"
+
+Example 2 - Technology Article:
+"The article discusses AI replacing human workers in healthcare. Some people support this for efficiency, while others worry about job losses. What is your opinion on this debate? Should AI replace human workers, or should it only assist them?"
+
+Example 3 - Political Article:
+"The article describes a new immigration policy that has divided public opinion. Supporters say it will strengthen the economy, while critics argue it will harm social cohesion. What are your thoughts on this controversy? Which perspective do you agree with and why?"
+
+Example 4 - Social Issue Article:
+"The article reports that some schools are banning smartphones, with supporters citing improved focus and critics pointing to communication needs. What is your position on this debate? Should schools ban smartphones?"
 
 === EXAMPLES OF BAD QUESTIONS (TOO GENERIC) ===
-- "What do you think about this article?" (too generic)
-- "What is your opinion?" (not article-specific)
-- "Do you agree or disagree?" (not engaging with article content)
+- "What do you think about this article?" (doesn't identify a specific issue)
+- "What is your opinion on this topic?" (too vague, no controversy identified)
+- "Do you agree or disagree with the article?" (doesn't engage with specific debate points)
+- "Summarize the main points of this article." (not a debate question)
 
-=== IMPORTANT ===
-- Your question MUST reference specific content from the article
-- Your question MUST be unique to this article, not a generic writing prompt
+=== CRITICAL REQUIREMENTS ===
+- Your question MUST identify and focus on a SPECIFIC DEBATABLE ISSUE from the article
+- Your question MUST present different perspectives or sides of the debate
+- Your question MUST ask students to take a position or analyze the controversy
+- Your question MUST reference specific details from the article (policies, numbers, events, arguments)
+- Your question MUST be unique to this article's specific controversy, not a generic question
 - Return ONLY the question text, no additional explanation or formatting
-- The question should make it clear that the student has read and understood the article`
+- The question should make it clear that the student has read and understood the article's key debate points`
 
-    const systemInstruction = `You are an English language teacher creating writing prompts for students. 
-Your questions MUST be:
-1. Directly related to the SPECIFIC article content provided
-2. Reference specific details, events, or arguments from the article
-3. NOT generic - each question should be unique to the article
-4. Encourage critical thinking about the article's specific content
+    const systemInstruction = `You are an English language teacher creating writing prompts for students.
 
-Always respond with a clear, direct question only. Do NOT use generic phrases like "What do you think about this article?" Instead, reference specific content from the article.`
+CRITICAL INSTRUCTIONS:
+1. ANALYZE the article to identify DEBATABLE ISSUES, CONTROVERSIES, or CONFLICTING PERSPECTIVES
+2. Create a question that focuses on a SPECIFIC DEBATABLE ISSUE from the article
+3. The question MUST present different sides or perspectives of the debate
+4. The question MUST ask students to take a position or analyze the controversy
+5. Reference specific details, policies, events, or arguments from the article
+6. NOT generic - each question should be unique to the article's specific controversy
+
+Your questions MUST:
+- Identify a specific debatable issue or controversy from the article
+- Present different perspectives or viewpoints
+- Ask students to engage with the debate, not just summarize
+- Reference specific content from the article
+
+BAD examples (DO NOT CREATE):
+- "What do you think about this article?" (too generic, no issue identified)
+- "What is your opinion?" (no specific controversy)
+- "Do you agree or disagree?" (doesn't engage with debate points)
+
+GOOD examples:
+- Questions that identify a controversy and ask students to take a position
+- Questions that present different perspectives and ask for analysis
+- Questions that reference specific policies, events, or arguments from the article
+
+Always respond with a clear, direct question only. Focus on DEBATABLE ISSUES, not just article content.`
 
     try {
       const question = await generateText(prompt, systemInstruction)
@@ -131,20 +170,42 @@ Always respond with a clear, direct question only. Do NOT use generic phrases li
     } catch (error: any) {
       console.error('Error generating question:', error)
       
-      // Fallback: 기사 내용 기반 기본 질문 생성
-      const extractMainTopic = (title: string, content: string): string => {
+      // Fallback: 기사 내용에서 쟁점 추출하여 질문 생성
+      const extractDebatableIssue = (title: string, content: string): { topic: string; issue: string } => {
+        // 제목과 내용에서 논쟁적 키워드 찾기
+        const debateKeywords = ['debate', 'controversy', 'disagreement', 'conflict', 'opposition', 'critics', 'supporters', 'pros and cons', 'benefits and drawbacks', 'challenges', 'concerns', 'opposing views']
+        const text = (title + ' ' + content).toLowerCase()
+        
+        // 논쟁적 키워드가 있는지 확인
+        const hasDebate = debateKeywords.some(keyword => text.includes(keyword))
+        
         // 제목에서 주요 명사 추출
         const titleWords = title.toLowerCase().split(/\s+/).filter(w => w.length > 4)
         const mainTopic = titleWords[0] || 'this topic'
-        return mainTopic
+        
+        // 내용에서 잠재적 쟁점 찾기 (예: "some say", "others argue", "critics", "supporters")
+        let issue = ''
+        if (text.includes('some say') || text.includes('others argue')) {
+          issue = 'different opinions'
+        } else if (text.includes('critics') || text.includes('opponents')) {
+          issue = 'opposing viewpoints'
+        } else if (text.includes('benefits') && text.includes('drawbacks')) {
+          issue = 'benefits and drawbacks'
+        } else if (text.includes('challenges') || text.includes('concerns')) {
+          issue = 'challenges and concerns'
+        } else {
+          issue = 'different perspectives'
+        }
+        
+        return { topic: mainTopic, issue }
       }
       
-      const mainTopic = extractMainTopic(title, content)
+      const { topic, issue } = extractDebatableIssue(title, content)
       
       const fallbackQuestions: Record<string, string> = {
-        beginner: `The article talks about ${mainTopic}. What do you think about this? Write your opinion in simple English.`,
-        intermediate: `The article discusses ${mainTopic}. What is your opinion on this topic? Please provide your analysis and thoughts.`,
-        advanced: `The article analyzes ${mainTopic}. Critically evaluate the arguments presented and discuss the broader implications of this topic.`,
+        beginner: `The article talks about ${topic}. Some people have different opinions about this. What do you think? Write your opinion in simple English.`,
+        intermediate: `The article discusses ${topic}, and there are ${issue} on this topic. What is your position on this debate? Please provide your analysis and explain your reasoning.`,
+        advanced: `The article analyzes ${topic}, presenting ${issue}. Critically evaluate the different perspectives and discuss which position you support and why.`,
       }
       
       return NextResponse.json({ 
@@ -159,3 +220,4 @@ Always respond with a clear, direct question only. Do NOT use generic phrases li
     )
   }
 }
+
