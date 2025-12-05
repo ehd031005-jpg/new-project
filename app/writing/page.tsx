@@ -80,12 +80,37 @@ export default function WritingPage() {
     setMode('question')
     
     try {
+      // 기사 전체 내용 가져오기 (최대 5000자)
+      let fullContent = article.content
+      
+      // content가 짧으면 fetch-article API로 전체 내용 가져오기 시도
+      if (article.content.length < 1000 && article.id) {
+        try {
+          // articleId에서 URL 추출 시도 (real-X 형식이면)
+          const articleDetailResponse = await fetch(`/api/news/${article.id}`, { cache: 'no-store' })
+          if (articleDetailResponse.ok) {
+            const articleDetail = await articleDetailResponse.json()
+            if (articleDetail.url) {
+              const fetchResponse = await fetch(`/api/fetch-article?url=${encodeURIComponent(articleDetail.url)}`, { cache: 'no-store' })
+              if (fetchResponse.ok) {
+                const fetchData = await fetchResponse.json()
+                if (fetchData.success && fetchData.content) {
+                  fullContent = fetchData.content
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.log('Could not fetch full content, using provided content')
+        }
+      }
+      
       const response = await fetch('/api/generate-question', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: article.title,
-          content: article.content,
+          content: fullContent,
           level: article.level || level,
         }),
       })
