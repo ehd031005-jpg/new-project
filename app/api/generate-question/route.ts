@@ -43,6 +43,64 @@ export async function POST(request: NextRequest) {
     // 기사 내용을 더 많이 사용 (5000자)
     const articleContent = content.substring(0, 5000)
     
+    // STEP 1: AI를 사용하여 기사에서 구체적인 쟁점 추출
+    const extractControversyPrompt = `Analyze this news article and identify the SPECIFIC CONTROVERSIAL ISSUE or DEBATE. 
+
+Article Title: ${title}
+Article Content: ${articleContent.substring(0, 3000)}
+
+Your task:
+1. Identify what people are DISAGREEING about in this article
+2. Find TWO OPPOSING PERSPECTIVES with specific details
+3. Extract specific numbers, policies, events, or groups mentioned
+
+Look for:
+- Opposing viewpoints (e.g., "some say X, but others argue Y")
+- Conflicts between groups (supporters vs critics, experts disagree)
+- Debates about policies or decisions
+- Trade-offs (economic vs environmental, efficiency vs safety)
+- Specific numbers, percentages, or statistics mentioned
+
+Return your answer in this EXACT JSON format:
+{
+  "controversy": "Brief description of the main controversy (1-2 sentences)",
+  "side1": {
+    "group": "Who supports this side (e.g., experts, supporters, government)",
+    "argument": "Their specific argument or claim (with numbers/details if available)"
+  },
+  "side2": {
+    "group": "Who opposes this side (e.g., critics, opponents, experts)",
+    "argument": "Their specific argument or claim (with numbers/details if available)"
+  },
+  "specificDetails": ["List of specific numbers, policies, events mentioned (e.g., '50% reduction', '$500 billion', 'new immigration policy')"]
+}
+
+If you cannot find a clear controversy, identify what COULD be debated based on potential consequences or different stakeholder perspectives.`
+
+    let controversyData: {
+      controversy: string
+      side1: { group: string; argument: string }
+      side2: { group: string; argument: string }
+      specificDetails: string[]
+    } | null = null
+
+    try {
+      // 쟁점 추출 시도
+      const controversyResponse = await generateText(extractControversyPrompt, 'You are an expert at analyzing news articles and identifying controversies. Always respond with valid JSON only.')
+      
+      // JSON 추출
+      const jsonMatch = controversyResponse.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        try {
+          controversyData = JSON.parse(jsonMatch[0])
+        } catch (e) {
+          console.warn('Failed to parse controversy JSON, continuing without it')
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to extract controversy, will use article content directly:', error)
+    }
+    
     // 기사에서 핵심 키워드와 주제 추출 (간단한 추출)
     const extractKeyTopics = (text: string): string[] => {
       const words = text.toLowerCase()
@@ -71,12 +129,26 @@ export async function POST(request: NextRequest) {
     
     const keySentences = extractKeySentences(articleContent)
     
-    // 기사 내용을 분석하여 쟁점 기반 질문 생성 (강화된 버전)
-    const prompt = `You are an English language teacher. Your CRITICAL task is to ANALYZE this news article, identify a SPECIFIC CONTROVERSIAL ISSUE or DEBATE, and create a question that forces students to engage with the CONFLICT or DISAGREEMENT in the article.
+    // STEP 2: 추출된 쟁점을 기반으로 질문 생성
+    const controversySection = controversyData 
+      ? `=== IDENTIFIED CONTROVERSY ===
+Main Controversy: ${controversyData.controversy}
 
-${levelInstructions}
+Side 1 - ${controversyData.side1.group}:
+${controversyData.side1.argument}
 
-=== ARTICLE INFORMATION ===
+Side 2 - ${controversyData.side2.group}:
+${controversyData.side2.argument}
+
+Specific Details: ${controversyData.specificDetails.join(', ')}
+
+=== YOUR TASK ===
+Based on the controversy identified above, create a debate question that:
+1. Presents BOTH sides clearly (${controversyData.side1.group} vs ${controversyData.side2.group})
+2. References the specific arguments and details provided
+3. Asks students to take a position on this specific debate
+`
+      : `=== ARTICLE INFORMATION ===
 Title: ${title}
 
 Key Topics/Keywords: ${keyTopics.join(', ')}
@@ -86,6 +158,15 @@ ${keySentences}
 
 Full Article Content:
 ${articleContent}
+
+=== YOUR TASK ===
+Analyze this article to identify a SPECIFIC CONTROVERSIAL ISSUE or DEBATE, then create a question.`
+
+    const prompt = `You are an English language teacher. Your CRITICAL task is to create a debate question based on the controversy identified below.
+
+${levelInstructions}
+
+${controversySection}
 
 === STEP 1: IDENTIFY THE CONTROVERSY ===
 You MUST first identify what people are DISAGREEING about in this article. Look for:
@@ -191,7 +272,7 @@ Always respond with ONLY the question text. Start with the controversy, not with
         .replace(/^The\s+question\s+is:\s*/i, '')
         .trim()
       
-      // "This article discusses..." 같은 금지된 시작 패턴 제거 및 재생성
+      // 금지된 시작 패턴
       const forbiddenStarts = [
         /^this\s+article\s+(discusses?|mentions?|talks?\s+about|describes?|reports?)/i,
         /^the\s+article\s+(discusses?|mentions?|talks?\s+about|describes?|reports?)/i,
@@ -199,21 +280,34 @@ Always respond with ONLY the question text. Start with the controversy, not with
         /^what\s+is\s+your\s+opinion\s+on\s+this/i,
       ]
       
-      const hasForbiddenStart = forbiddenStarts.some(pattern => pattern.test(cleanQuestion))
+      // 일반적인 표현 패턴 (쟁점이 구체적이지 않음)
+      const genericPatterns = [
+        /there\s+are\s+different\s+perspectives\s+on\s+this\s+topic/i,
+        /people\s+have\s+different\s+opinions/i,
+        /there\s+are\s+various\s+viewpoints/i,
+        /some\s+people\s+think\s+[^,]+,\s+and\s+there\s+are\s+different\s+perspectives/i,
+      ]
       
-      if (hasForbiddenStart) {
-        console.warn('Generated question has forbidden format, attempting to fix...')
-        // 금지된 시작을 제거하고 재구성 시도
-        cleanQuestion = cleanQuestion
-          .replace(/^(this\s+article|the\s+article)\s+(discusses?|mentions?|talks?\s+about|describes?|reports?)\s+/i, '')
-          .replace(/^what\s+do\s+you\s+think\s+about\s+this\s+article[.,]?\s*/i, '')
-          .replace(/^what\s+is\s+your\s+opinion\s+on\s+this[.,]?\s*/i, '')
-          .trim()
-        
-        // 여전히 문제가 있으면 fallback 사용
-        if (cleanQuestion.length < 30 || forbiddenStarts.some(p => p.test(cleanQuestion))) {
-          throw new Error('Question format not acceptable, using fallback')
-        }
+      const hasForbiddenStart = forbiddenStarts.some(pattern => pattern.test(cleanQuestion))
+      const hasGenericPattern = genericPatterns.some(pattern => pattern.test(cleanQuestion))
+      
+      // 구체적인 쟁점이 있는지 확인 (두 가지 명확한 대립 관점이 있어야 함)
+      const hasSpecificControversy = 
+        /(?:some|many|experts|critics|supporters|proponents|opponents)\s+(?:argue|claim|say|believe|think|worry|support|oppose|favor|prefer)/i.test(cleanQuestion) &&
+        /(?:while|but|however|whereas|on\s+the\s+other\s+hand|conversely)\s+(?:others|some|many|experts|critics|supporters)/i.test(cleanQuestion)
+      
+      // 구체적인 세부사항이 있는지 확인 (숫자, 정책명, 그룹명 등)
+      const hasSpecificDetails = 
+        /(?:by\s+)?\d+%|\$\d+|\d+\s+(?:million|billion|thousand|percent|people|countries)/i.test(cleanQuestion) ||
+        /(?:policy|law|plan|proposal|decision|agreement|treaty)/i.test(cleanQuestion) ||
+        /(?:government|experts|critics|supporters|opponents|proponents|administrators|professionals)/i.test(cleanQuestion)
+      
+      // 질문이 충분히 구체적인지 확인
+      const isQuestionSpecific = hasSpecificControversy && hasSpecificDetails && cleanQuestion.length > 50
+      
+      if (hasForbiddenStart || hasGenericPattern || !isQuestionSpecific) {
+        console.warn('Generated question is too generic or has forbidden format, using fallback...')
+        throw new Error('Question format not acceptable - too generic or lacks specific controversy')
       }
       
       return NextResponse.json({ question: cleanQuestion })
