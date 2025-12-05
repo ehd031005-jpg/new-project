@@ -71,8 +71,8 @@ export async function POST(request: NextRequest) {
     
     const keySentences = extractKeySentences(articleContent)
     
-    // 기사 내용을 분석하여 쟁점 기반 질문 생성
-    const prompt = `You are an English language teacher. Your task is to ANALYZE this news article, identify the KEY DEBATABLE ISSUES or CONTROVERSIAL POINTS, and create a question that asks students to engage with these specific issues.
+    // 기사 내용을 분석하여 쟁점 기반 질문 생성 (강화된 버전)
+    const prompt = `You are an English language teacher. Your CRITICAL task is to ANALYZE this news article, identify a SPECIFIC CONTROVERSIAL ISSUE or DEBATE, and create a question that forces students to engage with the CONFLICT or DISAGREEMENT in the article.
 
 ${levelInstructions}
 
@@ -87,84 +87,134 @@ ${keySentences}
 Full Article Content:
 ${articleContent}
 
-=== YOUR TASK ===
-1. **ANALYZE the article** to identify:
-   - What are the main debatable issues or controversial points?
-   - What are the different perspectives or viewpoints mentioned?
-   - What are the potential benefits and drawbacks?
-   - What are the implications or consequences?
-   - What are the ethical, social, economic, or political concerns?
+=== STEP 1: IDENTIFY THE CONTROVERSY ===
+You MUST first identify what people are DISAGREEING about in this article. Look for:
+- Opposing viewpoints (e.g., "some say X, but others argue Y")
+- Conflicts between groups (e.g., "supporters vs critics", "experts disagree")
+- Debates about policies or decisions (e.g., "pros and cons", "benefits vs drawbacks")
+- Ethical dilemmas (e.g., "right vs wrong", "fair vs unfair")
+- Trade-offs (e.g., "economic growth vs environmental protection")
+- Controversial claims or arguments
 
-2. **CREATE a question** that:
-   - Focuses on a SPECIFIC DEBATABLE ISSUE from the article (not just a summary)
-   - Asks students to take a position or analyze different perspectives
-   - References specific details, policies, events, or arguments from the article
-   - Encourages critical thinking about the controversy or debate
-   - Uses vocabulary and sentence complexity matching ${level} level
-   - Requires a written response appropriate for ${level} level (see word count above)
+If you cannot find a clear controversy, identify what COULD be debated:
+- Potential negative consequences vs positive outcomes
+- Different stakeholder perspectives (government, citizens, businesses, etc.)
+- Short-term vs long-term implications
+- Different solutions to the problem mentioned
 
-=== EXAMPLES OF GOOD ISSUE-BASED QUESTIONS ===
+=== STEP 2: CREATE A DEBATE QUESTION ===
+Your question MUST:
+1. **Present the TWO SIDES of the controversy** (e.g., "Some argue X, while others believe Y")
+2. **Reference SPECIFIC details from the article** (numbers, policies, events, names)
+3. **Ask students to TAKE A POSITION** on the debate
+4. **NOT start with "This article discusses..." or "The article mentions..."** - these are too generic!
+5. **Start directly with the CONTROVERSY or DEBATE** (e.g., "Some experts argue... while others claim...")
 
-Example 1 - Climate Policy Article:
-"The article states that countries agreed to reduce emissions by 50% by 2030, but some experts argue this will hurt economic growth. What are the potential benefits and drawbacks of this policy? Do you think the environmental benefits outweigh the economic costs?"
+=== FORBIDDEN QUESTION FORMATS (DO NOT USE) ===
+❌ "This article discusses [topic]. What do you think?"
+❌ "The article mentions [topic]. What is your opinion?"
+❌ "What do you think about this article?"
+❌ "What is your opinion on [topic]?"
+❌ "Do you agree or disagree with the article?"
+
+These formats are TOO GENERIC and do not engage with specific controversies!
+
+=== REQUIRED QUESTION FORMATS ===
+✅ "Some experts argue that [specific claim from article], while others believe [opposing claim]. What is your position on this debate?"
+✅ "[Specific policy/event from article] has divided opinion. Supporters say [specific reason], but critics argue [specific reason]. Which perspective do you support and why?"
+✅ "The article presents a conflict between [group A] who want [X] and [group B] who prefer [Y]. What are the potential benefits and drawbacks of each approach? Which do you think is better?"
+✅ "[Specific number/statistic from article] suggests [one perspective], but [another group] argues [opposing perspective]. What are your thoughts on this controversy?"
+
+=== EXAMPLES OF EXCELLENT DEBATE QUESTIONS ===
+
+Example 1 - Climate Article:
+"Some experts argue that reducing emissions by 50% by 2030 will cause economic recession, while others claim it will create millions of green jobs. The article mentions that $500 billion will be invested. Do you think this investment will help or hurt the economy? Which side of this debate do you support?"
 
 Example 2 - Technology Article:
-"The article discusses AI replacing human workers in healthcare. Some people support this for efficiency, while others worry about job losses. What is your opinion on this debate? Should AI replace human workers, or should it only assist them?"
+"The article reports that AI is replacing healthcare workers. Hospital administrators support this for cost savings, but medical professionals worry about patient care quality. What are the potential benefits and risks of replacing human workers with AI? Should hospitals prioritize efficiency or human connection?"
 
 Example 3 - Political Article:
-"The article describes a new immigration policy that has divided public opinion. Supporters say it will strengthen the economy, while critics argue it will harm social cohesion. What are your thoughts on this controversy? Which perspective do you agree with and why?"
+"A new immigration policy has divided the country. Supporters claim it will add $50 billion to the economy, while critics argue it will increase unemployment by 2%. The article mentions both perspectives. Which economic argument do you find more convincing and why?"
 
-Example 4 - Social Issue Article:
-"The article reports that some schools are banning smartphones, with supporters citing improved focus and critics pointing to communication needs. What is your position on this debate? Should schools ban smartphones?"
+Example 4 - Education Article:
+"Some schools are banning smartphones, citing a 30% improvement in test scores. However, parents argue this prevents emergency communication. The article presents both sides. What is your position on this debate? Should schools prioritize academic performance or safety?"
 
-=== EXAMPLES OF BAD QUESTIONS (TOO GENERIC) ===
-- "What do you think about this article?" (doesn't identify a specific issue)
-- "What is your opinion on this topic?" (too vague, no controversy identified)
-- "Do you agree or disagree with the article?" (doesn't engage with specific debate points)
-- "Summarize the main points of this article." (not a debate question)
+=== CRITICAL INSTRUCTIONS ===
+1. **DO NOT start with "This article discusses..."** - Start with the CONTROVERSY itself
+2. **MUST present TWO opposing perspectives** from the article
+3. **MUST reference SPECIFIC details** (numbers, policies, groups, events)
+4. **MUST ask students to TAKE A POSITION** on the debate
+5. **MUST be unique to this article's specific controversy**
+6. Return ONLY the question text, no explanation
 
-=== CRITICAL REQUIREMENTS ===
-- Your question MUST identify and focus on a SPECIFIC DEBATABLE ISSUE from the article
-- Your question MUST present different perspectives or sides of the debate
-- Your question MUST ask students to take a position or analyze the controversy
-- Your question MUST reference specific details from the article (policies, numbers, events, arguments)
-- Your question MUST be unique to this article's specific controversy, not a generic question
-- Return ONLY the question text, no additional explanation or formatting
-- The question should make it clear that the student has read and understood the article's key debate points`
+=== YOUR OUTPUT ===
+Create ONE question that follows the required format above. Start directly with the controversy, not with "This article..." or "The article discusses..."`
 
-    const systemInstruction = `You are an English language teacher creating writing prompts for students.
+    const systemInstruction = `You are an English language teacher creating debate-based writing prompts.
 
-CRITICAL INSTRUCTIONS:
-1. ANALYZE the article to identify DEBATABLE ISSUES, CONTROVERSIES, or CONFLICTING PERSPECTIVES
-2. Create a question that focuses on a SPECIFIC DEBATABLE ISSUE from the article
-3. The question MUST present different sides or perspectives of the debate
-4. The question MUST ask students to take a position or analyze the controversy
-5. Reference specific details, policies, events, or arguments from the article
-6. NOT generic - each question should be unique to the article's specific controversy
+ABSOLUTE REQUIREMENTS:
+1. You MUST identify a SPECIFIC CONTROVERSY or DEBATE in the article
+2. You MUST present TWO OPPOSING PERSPECTIVES from the article
+3. You MUST ask students to TAKE A POSITION on the debate
+4. You MUST reference SPECIFIC details (numbers, policies, groups, events) from the article
+5. You MUST NOT start with "This article discusses..." or "The article mentions..." - these are FORBIDDEN formats
 
-Your questions MUST:
-- Identify a specific debatable issue or controversy from the article
-- Present different perspectives or viewpoints
-- Ask students to engage with the debate, not just summarize
-- Reference specific content from the article
+FORBIDDEN QUESTION STARTS (NEVER USE):
+- "This article discusses..."
+- "The article mentions..."
+- "What do you think about this article?"
+- "What is your opinion on [topic]?"
+- "Do you agree or disagree?"
 
-BAD examples (DO NOT CREATE):
-- "What do you think about this article?" (too generic, no issue identified)
-- "What is your opinion?" (no specific controversy)
-- "Do you agree or disagree?" (doesn't engage with debate points)
+REQUIRED QUESTION STRUCTURE:
+Start with the CONTROVERSY itself, not the article:
+- "Some experts argue [X], while others claim [Y]..."
+- "[Policy/Event] has divided opinion. Supporters say [X], but critics argue [Y]..."
+- "There is a debate between [Group A] who want [X] and [Group B] who prefer [Y]..."
 
-GOOD examples:
-- Questions that identify a controversy and ask students to take a position
-- Questions that present different perspectives and ask for analysis
-- Questions that reference specific policies, events, or arguments from the article
+Your question MUST:
+1. Present TWO opposing sides of a controversy
+2. Reference specific details from the article
+3. Ask students to take a position
+4. Be unique to this article's specific debate
 
-Always respond with a clear, direct question only. Focus on DEBATABLE ISSUES, not just article content.`
+Always respond with ONLY the question text. Start with the controversy, not with "This article..."`
 
     try {
       const question = await generateText(prompt, systemInstruction)
       
       // 질문 정리 (불필요한 텍스트 제거)
-      const cleanQuestion = question.trim().replace(/^Question:\s*/i, '').replace(/^Q:\s*/i, '').trim()
+      let cleanQuestion = question.trim()
+        .replace(/^Question:\s*/i, '')
+        .replace(/^Q:\s*/i, '')
+        .replace(/^Here's\s+(the\s+)?question:\s*/i, '')
+        .replace(/^The\s+question\s+is:\s*/i, '')
+        .trim()
+      
+      // "This article discusses..." 같은 금지된 시작 패턴 제거 및 재생성
+      const forbiddenStarts = [
+        /^this\s+article\s+(discusses?|mentions?|talks?\s+about|describes?|reports?)/i,
+        /^the\s+article\s+(discusses?|mentions?|talks?\s+about|describes?|reports?)/i,
+        /^what\s+do\s+you\s+think\s+about\s+this\s+article/i,
+        /^what\s+is\s+your\s+opinion\s+on\s+this/i,
+      ]
+      
+      const hasForbiddenStart = forbiddenStarts.some(pattern => pattern.test(cleanQuestion))
+      
+      if (hasForbiddenStart) {
+        console.warn('Generated question has forbidden format, attempting to fix...')
+        // 금지된 시작을 제거하고 재구성 시도
+        cleanQuestion = cleanQuestion
+          .replace(/^(this\s+article|the\s+article)\s+(discusses?|mentions?|talks?\s+about|describes?|reports?)\s+/i, '')
+          .replace(/^what\s+do\s+you\s+think\s+about\s+this\s+article[.,]?\s*/i, '')
+          .replace(/^what\s+is\s+your\s+opinion\s+on\s+this[.,]?\s*/i, '')
+          .trim()
+        
+        // 여전히 문제가 있으면 fallback 사용
+        if (cleanQuestion.length < 30 || forbiddenStarts.some(p => p.test(cleanQuestion))) {
+          throw new Error('Question format not acceptable, using fallback')
+        }
+      }
       
       return NextResponse.json({ question: cleanQuestion })
     } catch (error: any) {
