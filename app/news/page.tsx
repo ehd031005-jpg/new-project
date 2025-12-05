@@ -56,9 +56,13 @@ export default function NewsPage() {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
       const data = await response.json()
       
-      if (data.articles && data.articles.length > 0) {
+      if (data && data.articles && Array.isArray(data.articles) && data.articles.length > 0) {
         setArticles(data.articles)
         setSelectedArticle(data.articles[0])
         setLoading(false)
@@ -73,9 +77,13 @@ export default function NewsPage() {
       }
       
       const fallbackData = await fallbackResponse.json()
-      setArticles(fallbackData.articles || [])
-      if (fallbackData.articles && fallbackData.articles.length > 0) {
-        setSelectedArticle(fallbackData.articles[0])
+      if (fallbackData && fallbackData.articles && Array.isArray(fallbackData.articles)) {
+        setArticles(fallbackData.articles)
+        if (fallbackData.articles.length > 0) {
+          setSelectedArticle(fallbackData.articles[0])
+        }
+      } else {
+        setArticles([])
       }
     } catch (error) {
       console.error('Failed to fetch articles:', error)
@@ -145,11 +153,11 @@ The agreement emphasizes the importance of solar and wind energy, with many coun
       
       const data = await response.json()
       
-      if (data.success && data.content) {
+      if (data && data.success && data.content && typeof data.content === 'string') {
         console.log(`전체 기사 내용 가져오기 성공: ${data.content.length} characters`)
         setFullContent(data.content)
       } else {
-        console.warn('전체 기사 내용을 가져오지 못했습니다:', data.message || 'Unknown error')
+        console.warn('전체 기사 내용을 가져오지 못했습니다:', data?.message || 'Unknown error')
         // 전체 내용을 가져오지 못한 경우 원본 content 사용
         setFullContent(null)
       }

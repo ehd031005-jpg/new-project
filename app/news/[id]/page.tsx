@@ -7,10 +7,26 @@ import Link from 'next/link'
 import CulturalContextCard from '@/components/CulturalContextCard'
 import RephraseCompare from '@/components/RephraseCompare'
 
+interface NewsArticle {
+  id: string
+  title: string
+  summary?: string
+  content: string
+  keywords?: string[]
+  grammarPoints?: string[]
+  culturalContext?: {
+    title: string
+    description: string
+    examples: string[]
+  }
+  url?: string
+  level?: 'beginner' | 'intermediate' | 'advanced'
+}
+
 export default function NewsDetailPage() {
   const params = useParams()
   const articleId = params.id as string
-  const [article, setArticle] = useState<any>(null)
+  const [article, setArticle] = useState<NewsArticle | null>(null)
   const [fullContent, setFullContent] = useState<string | null>(null)
   const [loadingFullContent, setLoadingFullContent] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -32,10 +48,19 @@ export default function NewsDetailPage() {
     setLoading(true)
     try {
       const response = await fetch(`/api/news/${articleId}`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
       const data = await response.json()
-      setArticle(data.article)
+      if (data && data.article) {
+        setArticle(data.article)
+      } else {
+        console.error('Article not found in response')
+        setArticle(null)
+      }
     } catch (error) {
       console.error('Failed to fetch article:', error)
+      setArticle(null)
     } finally {
       setLoading(false)
     }
@@ -53,11 +78,11 @@ export default function NewsDetailPage() {
       
       const data = await response.json()
       
-      if (data.success && data.content) {
+      if (data && data.success && data.content && typeof data.content === 'string') {
         console.log(`전체 기사 내용 가져오기 성공: ${data.content.length} characters`)
         setFullContent(data.content)
       } else {
-        console.warn('전체 기사 내용을 가져오지 못했습니다:', data.message || 'Unknown error')
+        console.warn('전체 기사 내용을 가져오지 못했습니다:', data?.message || 'Unknown error')
         setFullContent(null)
       }
     } catch (error) {
@@ -108,11 +133,11 @@ export default function NewsDetailPage() {
       </Link>
 
       <div className="card">
-        <h1 className="text-4xl font-bold mb-4">{article.title}</h1>
+        <h1 className="text-4xl font-bold mb-4">{article?.title || 'Untitled'}</h1>
         
         <div className="mb-6">
           <button
-            onClick={() => handlePlayAudio(article.content)}
+            onClick={() => handlePlayAudio(article?.content || '')}
             className="flex items-center gap-2 text-primary-600 hover:text-primary-700"
           >
             <Volume2 className="w-5 h-5" />
@@ -121,7 +146,7 @@ export default function NewsDetailPage() {
         </div>
 
         {/* Keywords */}
-        {article.keywords && article.keywords.length > 0 && (
+        {article?.keywords && article.keywords.length > 0 && (
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-primary-600" />
@@ -141,7 +166,7 @@ export default function NewsDetailPage() {
         )}
 
         {/* Grammar Points */}
-        {article.grammarPoints && article.grammarPoints.length > 0 && (
+        {article?.grammarPoints && article.grammarPoints.length > 0 && (
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-2">문법 포인트</h3>
             <ul className="list-disc list-inside space-y-1 text-gray-700">
@@ -164,7 +189,7 @@ export default function NewsDetailPage() {
             )}
           </div>
           <div className="prose max-w-none">
-            {(fullContent || article.content)?.split('\n')
+            {(fullContent || article?.content || '')?.split('\n')
               .map((paragraph: string) => {
                 // "+chars" 같은 제한 표시 제거
                 let cleaned = paragraph.replace(/\s*\[\+\d+\s*chars?\]/gi, '')
@@ -212,25 +237,25 @@ export default function NewsDetailPage() {
         </div>
 
         {/* Cultural Context Card */}
-        {article.culturalContext && (
+        {article?.culturalContext && (
           <CulturalContextCard context={article.culturalContext} />
         )}
 
         {/* Rephrase and Compare */}
         <div className="mt-6">
-          <RephraseCompare text={(fullContent || article.content)?.substring(0, 500) || article.content?.substring(0, 200) || ''} />
+          <RephraseCompare text={(fullContent || article?.content || '').substring(0, 500) || (article?.content || '').substring(0, 200) || ''} />
         </div>
 
         {/* Actions */}
         <div className="mt-8 flex gap-4">
           <Link
-            href={`/quiz?articleId=${article.id}&title=${encodeURIComponent(article.title)}&content=${encodeURIComponent((article.content || '').substring(0, 2000))}&keywords=${encodeURIComponent((article.keywords || []).join(','))}`}
+            href={`/quiz?articleId=${article?.id || ''}&title=${encodeURIComponent(article?.title || '')}&content=${encodeURIComponent((article?.content || '').substring(0, 2000))}&keywords=${encodeURIComponent((article?.keywords || []).join(','))}`}
             className="btn-primary"
           >
             이 기사로 퀴즈 풀기
           </Link>
           <Link
-            href={`/writing?articleId=${article.id}`}
+            href={`/writing?articleId=${article?.id || ''}`}
             className="btn-secondary"
           >
             의견문 작성하기

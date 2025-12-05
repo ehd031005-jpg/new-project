@@ -63,35 +63,42 @@ export default function QuizPage() {
     const articleTitle = searchParams?.get('title')
     const articleLevel = searchParams?.get('level') as 'beginner' | 'intermediate' | 'advanced' | null
 
-    if (articleId && articleTitle) {
-      // 기사 목록이 로드되면 해당 기사를 찾아서 퀴즈 시작
-      if (articles.length > 0) {
-        const article = articles.find(a => a.id === articleId)
-        if (article) {
-          setSelectedArticle(article)
-          if (articleLevel) {
-            setLevel(articleLevel)
-          }
-          handleArticleSelect(article)
-        }
-      } else {
-        // 기사 목록이 아직 로드되지 않았으면, 기사 정보로 가상의 기사 객체 생성하여 퀴즈 시작
-        const virtualArticle: NewsArticle = {
-          id: articleId,
-          title: decodeURIComponent(articleTitle),
-          summary: '',
-          content: '',
-          level: articleLevel || 'intermediate',
-          keywords: [],
-        }
-        setSelectedArticle(virtualArticle)
+    if (!articleId || !articleTitle) return
+
+    // 기사 목록이 로드되면 해당 기사를 찾아서 퀴즈 시작
+    if (articles.length > 0) {
+      const article = articles.find(a => a.id === articleId)
+      if (article) {
+        setSelectedArticle(article)
         if (articleLevel) {
           setLevel(articleLevel)
         }
-        handleArticleSelect(virtualArticle)
+        handleArticleSelect(article)
       }
+    } else if (!loadingArticles) {
+      // 기사 목록이 아직 로드되지 않았고 로딩이 완료되었으면, 기사 정보로 가상의 기사 객체 생성하여 퀴즈 시작
+      let decodedTitle = articleTitle
+      try {
+        decodedTitle = decodeURIComponent(articleTitle)
+      } catch (e) {
+        console.warn('Failed to decode article title, using original:', e)
+      }
+      const virtualArticle: NewsArticle = {
+        id: articleId,
+        title: decodedTitle,
+        summary: '',
+        content: '',
+        level: articleLevel || 'intermediate',
+        keywords: [],
+      }
+      setSelectedArticle(virtualArticle)
+      if (articleLevel) {
+        setLevel(articleLevel)
+      }
+      handleArticleSelect(virtualArticle)
     }
-  }, [searchParams, articles])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, articles.length, loadingArticles])
 
   const fetchArticles = async () => {
     setLoadingArticles(true)
@@ -183,11 +190,20 @@ export default function QuizPage() {
       setMode('completed')
       // 오답을 로컬 스토리지에 저장
       if (wrongAnswers.length > 0) {
-        const existingReviews = JSON.parse(
-          localStorage.getItem('reviewList') || '[]'
-        )
-        const updatedReviews = [...existingReviews, ...wrongAnswers]
-        localStorage.setItem('reviewList', JSON.stringify(updatedReviews))
+        try {
+          const stored = localStorage.getItem('reviewList')
+          const existingReviews = stored ? JSON.parse(stored) : []
+          const updatedReviews = [...existingReviews, ...wrongAnswers]
+          localStorage.setItem('reviewList', JSON.stringify(updatedReviews))
+        } catch (error) {
+          console.error('Failed to save review items to localStorage:', error)
+          // 에러 발생 시에도 새 오답만 저장 시도
+          try {
+            localStorage.setItem('reviewList', JSON.stringify(wrongAnswers))
+          } catch (e) {
+            console.error('Failed to save review items even as new list:', e)
+          }
+        }
       }
     }
   }
@@ -368,7 +384,29 @@ export default function QuizPage() {
   }
 
   // 퀴즈 풀기 화면
+  if (questions.length === 0) {
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <p className="text-gray-600 mb-4">퀴즈 문제를 불러올 수 없습니다.</p>
+        <button onClick={handleBackToSelect} className="btn-primary">
+          기사 선택으로 돌아가기
+        </button>
+      </div>
+    )
+  }
+
   const question = questions[currentQuestion]
+
+  if (!question) {
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <p className="text-gray-600 mb-4">퀴즈 문제를 불러올 수 없습니다.</p>
+        <button onClick={handleBackToSelect} className="btn-primary">
+          기사 선택으로 돌아가기
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">

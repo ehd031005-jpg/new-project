@@ -127,18 +127,19 @@ export async function GET(request: NextRequest) {
               }
 
               // 에러 발생 시에도 cultural context 생성 시도
-              let fallbackCulturalContext
+              let fallbackCulturalContext: { title: string; description: string; examples: string[] } | null = null
               try {
-                fallbackCulturalContext = await Promise.race([
+                const culturalResult = await Promise.race([
                   generateCulturalContext(
                     article.title || 'Untitled',
                     fullContent,
                     level as 'beginner' | 'intermediate' | 'advanced'
                   ),
-                  new Promise((_, reject) => 
+                  new Promise<{ title: string; description: string; examples: string[] }>((_, reject) => 
                     setTimeout(() => reject(new Error('Timeout')), 5000)
                   )
-                ]) as any
+                ])
+                fallbackCulturalContext = culturalResult
               } catch (e) {
                 // 실패 시 기본값 사용
               }
@@ -188,7 +189,20 @@ export async function GET(request: NextRequest) {
   }
 
   // 샘플 데이터 (NewsAPI 키가 없거나 오류 발생 시) - 난이도별로 다르게
-  let articles: any[] = []
+  let articles: Array<{
+    id: string
+    title: string
+    summary: string
+    content: string
+    level: string
+    keywords: string[]
+    grammarPoints: string[]
+    culturalContext: {
+      title: string
+      description: string
+      examples: string[]
+    }
+  }> = []
   
   if (level === 'beginner') {
     articles = [
@@ -335,6 +349,4 @@ Industry leaders emphasize the importance of ethical AI development and responsi
 
   return NextResponse.json({ articles })
 }
-
-
 

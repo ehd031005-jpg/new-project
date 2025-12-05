@@ -51,5 +51,3 @@ export interface RephrasedText {
   advanced: string
 }
 
-
-

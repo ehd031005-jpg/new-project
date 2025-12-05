@@ -48,10 +48,6 @@ export default function WritingPage() {
   const [loading, setLoading] = useState(false)
   const [showBeforeAfter, setShowBeforeAfter] = useState(false)
 
-  useEffect(() => {
-    fetchArticles()
-  }, [level])
-
   const fetchArticles = async () => {
     setLoadingArticles(true)
     try {
@@ -73,6 +69,11 @@ export default function WritingPage() {
       setLoadingArticles(false)
     }
   }
+
+  useEffect(() => {
+    fetchArticles()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [level])
 
   const handleArticleSelect = async (article: NewsArticle) => {
     setSelectedArticle(article)

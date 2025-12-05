@@ -16,12 +16,22 @@ export async function GET(request: NextRequest) {
 
     // 클라이언트에서 직접 기사 정보를 전달한 경우 (가장 확실한 방법)
     if (articleTitle && articleContent) {
-      article = {
-        title: decodeURIComponent(articleTitle),
-        content: decodeURIComponent(articleContent),
-        keywords: articleKeywords ? decodeURIComponent(articleKeywords).split(',').filter(k => k.trim()) : [],
+      try {
+        article = {
+          title: decodeURIComponent(articleTitle),
+          content: decodeURIComponent(articleContent),
+          keywords: articleKeywords ? decodeURIComponent(articleKeywords).split(',').filter(k => k.trim()) : [],
+        }
+        console.log(`클라이언트에서 기사 정보 받음: ${article.title?.substring(0, 50) || article.title || 'Unknown'}...`)
+      } catch (decodeError) {
+        console.error('Error decoding URI components:', decodeError)
+        // 디코딩 실패 시 원본 값 사용
+        article = {
+          title: articleTitle,
+          content: articleContent,
+          keywords: articleKeywords ? articleKeywords.split(',').filter(k => k.trim()) : [],
+        }
       }
-      console.log(`클라이언트에서 기사 정보 받음: ${article.title.substring(0, 50)}...`)
     }
     // articleId만 있는 경우 기사 찾기
     else if (articleId) {
@@ -43,7 +53,7 @@ export async function GET(request: NextRequest) {
         
         if (newsResponse.ok) {
           const newsData = await newsResponse.json()
-          const foundArticle = newsData.articles?.find((a: any) => a.id === articleId)
+          const foundArticle = newsData.articles?.find((a: { id: string; title?: string; content?: string; summary?: string; keywords?: string[] }) => a.id === articleId)
           
           if (foundArticle) {
             article = {
@@ -51,9 +61,9 @@ export async function GET(request: NextRequest) {
               content: foundArticle.content || foundArticle.summary || '',
               keywords: foundArticle.keywords || [],
             }
-            console.log(`기사 찾음: ${foundArticle.title.substring(0, 50)}...`)
+            console.log(`기사 찾음: ${foundArticle.title?.substring(0, 50) || foundArticle.title || 'Unknown'}...`)
           } else {
-            console.warn(`기사를 찾을 수 없음: articleId=${articleId}, 사용 가능한 ID: ${newsData.articles?.map((a: any) => a.id).join(', ')}`)
+            console.warn(`기사를 찾을 수 없음: articleId=${articleId}, 사용 가능한 ID: ${newsData.articles?.map((a: { id: string }) => a.id).join(', ')}`)
           }
         }
       } catch (error) {
@@ -81,7 +91,7 @@ The agreement emphasizes the importance of solar and wind energy, with many coun
 
     // AI로 퀴즈 생성
     const articleLevel = searchParams.get('level') || 'intermediate'
-    console.log(`퀴즈 생성 중: ${article.title.substring(0, 50)}... (난이도: ${articleLevel})`)
+    console.log(`퀴즈 생성 중: ${article.title?.substring(0, 50) || article.title || 'Unknown'}... (난이도: ${articleLevel})`)
     const questions = await generateQuizFromArticle(
       article.title,
       article.content,
@@ -145,6 +155,4 @@ The agreement emphasizes the importance of solar and wind energy, with many coun
     return NextResponse.json({ questions: fallbackQuestions })
   }
 }
-
-
 

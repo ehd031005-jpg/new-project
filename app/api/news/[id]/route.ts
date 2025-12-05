@@ -38,7 +38,7 @@ export async function GET(
     
     if (newsResponse.ok) {
       const newsData = await newsResponse.json()
-      const foundArticle = newsData.articles?.find((a: any) => {
+      const foundArticle = newsData.articles?.find((a: { id: string; title?: string }) => {
         // 정확한 ID 매칭
         if (a.id === articleId) return true
         // real-1 형식 매칭 (real-1-타임스탬프도 허용)
@@ -54,12 +54,25 @@ export async function GET(
         console.log(`기사 찾음: ${foundArticle.title.substring(0, 50)}...`)
         return NextResponse.json({ article: foundArticle })
       } else {
-        console.warn(`기사를 찾을 수 없음: articleId=${articleId}, 사용 가능한 ID: ${newsData.articles?.map((a: any) => a.id).join(', ')}`)
+        console.warn(`기사를 찾을 수 없음: articleId=${articleId}, 사용 가능한 ID: ${newsData.articles?.map((a: { id: string }) => a.id).join(', ')}`)
       }
     }
     
     // 샘플 데이터 확인
-    const sampleArticles: Record<string, any> = {
+    const sampleArticles: Record<string, {
+      id: string
+      title: string
+      summary: string
+      content: string
+      level: string
+      keywords: string[]
+      grammarPoints: string[]
+      culturalContext: {
+        title: string
+        description: string
+        examples: string[]
+      }
+    }> = {
       '1': {
         id: '1',
         title: 'Climate Summit 2025: Global Leaders Agree on Renewable Energy Targets',
